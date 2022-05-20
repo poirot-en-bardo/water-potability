@@ -1,0 +1,148 @@
+---
+title: "Proiect-Clasificarea_apei"
+output: html_notebook
+---
+
+Importarea librariilor necesare
+```{r}
+#install.packages("rlang")
+#library(rlang)
+#install.packages("tidyverse")
+library(tidyverse)
+library(modelr)
+library(caret)
+library(rsample)
+library(corrplot)
+library(dplyr)
+library(magrittr)
+```
+
+
+Incarcarea bazei de date
+```{r}
+water <- read.csv("water_potability.csv")
+data(water)
+View(water)
+summary(water)
+```
+
+
+---VIZUALIZAREA DATELOR---
+
+Am construit un grafic de puncte dupa proprietati si am observat ca nu e relevant, deoarece majoritatea datelor sunt concentrate in zona de mijloc.
+```{r}
+water %>% ggplot(aes(x=ph,y=Sulfate,color=Potability))+
+  geom_point()
+water %>% ggplot(aes(x=Sulfate,y=Hardness,color=Potability))+
+  geom_point()
+water %>% ggplot(aes(x=Trihalomethanes,y=Chloramines,color=Potability))+
+  geom_point()
+```
+
+Grupam datele dupa variabila tinta Potabilitate. Observam ca avem mai multe date pentru valoarea 0, deci mai multe date pentru apa nepotabila.
+```{r}
+by_Potability <- group_by(water, Potability)
+summarize(by_Potability, count=n())
+```
+
+
+Dorim sa vizualizam diferentele dintre variabile si care este legatura dintre cu variabila tinta, astfel ca afisam un grafic ce ilustreaza situatia pentru fiecare proprietate a apei in parte. Am utilizat valorile minime pentru fiecare variabila ca si termen de comparatie.
+```{r}
+water$Potability <- factor(water$Potability)
+
+water %>% group_by(Potability) %>%
+  summarize_all(~min(., na.rm = TRUE)) %>%
+  ungroup() %>%
+  #restructuram dataset - in afara de potability, preluam toate col, names_to preia de pe coloane, values_to preia din celule
+  pivot_longer(!Potability, names_to = "features", values_to = "min") %>%
+  #cream graficul pe orizontala prop, pe vert valori min)
+  ggplot(aes(features, min, fill = Potability)) +
+  #design-ul graficului
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~features, scales = "free")
+```
+Rezultatul obtinut poate fi interpretat astfel: in cadrul chloraminelor, duritatii, carbonului si a sulfatilor, valorile minime sunt mult mai ridicate in cazul apei nepotabile; in contrast, valorile minime ale conductivitatii, solidelor, trihalometanului si turbiditatii sunt mai ridicate pentru apa potabila; ph-ul prezinta un caz aparte, deoarce prezinta valori doar in cazul apei potabile, apa potabila avand mereu un caracter bazic, adica un ph pozitiv.
+
+
+---ANALIZA DATELOR---
+
+Generarea unui model in functie de proprietati.
+```{r}
+model_ph<-glm(data=water, Potability ~ ph, family=binomial)
+summary(model_ph)
+
+model_hard<-glm(data=water, Potability ~ Hardness, family=binomial)
+summary(model_hard)
+
+model_sol<-glm(data=water, Potability ~ Solids, family=binomial)
+summary(model_sol)
+
+model_ch<-glm(data=water, Potability ~ Chloramines, family=binomial)
+summary(model_ch)
+
+model_sulf<-glm(data=water, Potability ~ Sulfate, family=binomial)
+summary(model_sulf)
+
+model_cond<-glm(data=water, Potability ~ Conductivity, family=binomial)
+summary(model_cond)
+
+model_org<-glm(data=water, Potability ~ Organic_carbon, family=binomial)
+summary(model_org)
+
+model_thr<-glm(data=water, Potability ~ Trihalomethanes, family=binomial)
+summary(model_thr)
+
+model_trb<-glm(data=water, Potability ~ Turbidity, family=binomial)
+summary(model_trb)
+
+```
+Observam faptul ca valoarea lui p este destul de mare in fiecare din cazuri, ceea ce inseamna ca asocierea dintre variabila si variabila tinta nu este una seminificativa. Alegem insa spre analiza primele 3 cele mai mici valori ale lui p, si anume proprietatile Solids (p=0.0536), Organic_carbon (p=0.0861) si Chloraminele(p=0.174).
+
+
+Realizam modelul pentru cele 3 variabile alese.
+```{r}
+water_f <- drop_na(water)
+(model_prp <- glm(data=water_f, Potability~Solids+Organic_carbon+Chloramines, family=binomial))
+summary(model_prp)
+```
+Observam faptul ca proprietatea Solids este cea mai seminificativa, deoarece inregistreaza cea mai mica valoare a lui p de 0.0617. 
+
+
+
+
+
+
+1.SOLIDS
+Valoarea minima si maxima
+```{r}
+range(water$Solids)
+```
+
+```{r}
+grid <- water %>%
+  data_grid(Solids = seq_range(Solids, 100)) %>%
+  add_predictions(model_sol, "prob_default", type="response")
+```
+```{r}
+ggplot()+
+  geom_line(data=grid, aes(Solids, prob_default),color="red")
+```
+```{r}
+(nd <- tribble(~Solids, 1000,2000))
+(predicted <- predict(model_sol, newdata=nd, type="response"))
+```
+
+
+Model FINAL
+```{r}
+water_f <- drop_na(water)
+(model_final <- glm(data=water_f, Potability~ph+Hardness+Solids+Chloramines+Sulfate+Conductivity+Organic_carbon+Trihalomethanes+Turbidity, family=binomial))
+summary(model_final)
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
