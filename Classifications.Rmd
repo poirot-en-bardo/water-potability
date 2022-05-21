@@ -23,6 +23,7 @@ library(tree)
 library(ipred)
 library(randomForest)
 library(ranger)
+library(pROC)
 
 water <- read.csv("water_quality.csv")
 data(water)
@@ -324,6 +325,10 @@ Cea mai buna acuratete de pana acum: 96,58%.
 
 
 
+
+
+
+
 ---------------- Random Forest ----------------------------
 
 
@@ -341,6 +346,13 @@ mod_rf1
 ```{r}
 plot(mod_rf1)
 ```
+
+
+```{r}
+pred_mod_rf1 <- predict(mod_rf1, test, target ="class")  
+confusionMatrix(pred_mod_rf1, factor(test$potability))
+```
+
 
 Tuning:
 
@@ -414,4 +426,63 @@ mod_rf2 <- train(potability~.,
                 trControl = train_control)
 mod_rf2
 ```
+```{r}
+pred_mod_rf2 <- predict(mod_rf2, test, target ="class")  
+confusionMatrix(pred_mod_rf2, factor(test$potability))
+```
+
+
+
+
+
+---- Curbe ROC -----
+```{r}
+summary(pred_mod_bagged1)
+```
+
+
+```{r}
+pred_rf1_roc <- predict(mod_rf1, test, type="prob")  
+pred_rf2_roc <- predict(mod_rf2, test, type="prob")  
+pred_ranger_roc <- predict(optimal_ranger, test, probability = TRUE)  
+summary(pred_ranger_roc)
+pred_ranger_roc$predictions
+```
+
+
+```{r}
+dataset <- data.frame(actual.class = test$potability, probability = pred_rf1_roc, pred_rf2_roc, pred_ranger_roc$predictions)
+roc_rf1 <- roc(actual.class~pred_rf1_roc[,1], dataset)
+roc_rf2 <- roc(actual.class~pred_rf2_roc[,1], dataset)
+roc_ranger <- roc(actual.class~pred_ranger_roc$predictions, dataset)
+
+df1 <- data.frame(
+  specificity1 <- roc_rf1$specificities, 
+  sensitivity1 <- roc_rf1$sensitivities)
+
+df2 <- data.frame(
+  specificity2 <- roc_rf2$specificities, 
+  sensitivity2 <- roc_rf2$sensitivities)
+#scale_x_reverse = specificitatea 1 merge catre 0
+
+ggplot() + 
+  geom_line(df1, mapping = aes(x= specificity1, y = sensitivity1), color = "dark green") + 
+  scale_x_reverse() +
+  theme(text = element_text(size = 20))+
+geom_line(df2, mapping = aes(x = specificity2, y = sensitivity2), color = "blue") + 
+  scale_x_reverse() +
+  theme(text = element_text(size = 20))
+
+
+
+plot.roc(roc_rf1, print.auc=TRUE, col="dark green")
+plot.roc(roc_rf2, print.auc=TRUE, col="blue", add = TRUE)
+plot(roc_ranger, print.auc=TRUE, print.auc.y=.3, col="dark green")
+
+```
+
+
+- Random Forest
+
+
 
