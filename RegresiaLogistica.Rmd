@@ -15,6 +15,7 @@ library(rsample)
 library(corrplot)
 library(dplyr)
 library(magrittr)
+library(corrplot)
 ```
 
 
@@ -84,7 +85,40 @@ water %>%
 ```
 
 
+```{r}
+correlations <- cor(water[,1:9])
+# create correlation plot
+corrplot(correlations, method="circle")
+```
+
+
+
+
+
+---ÎMPĂRȚIREA DATELOR---
+
+```{r}
+#
+set.seed(123)
+split <- initial_split(water, prop=0.7, strata= "Potability")
+train <-training(split)
+test <- testing(split)
+summarize(by_Potability, count=n())
+```
+
+
+
+
+
 ---ANALIZA DATELOR---
+
+
+Generarea unui model in functie de toate proprietatile.
+```{r}
+water_f <- drop_na(water)
+(model_all <- glm(data=water_f, Potability~ph+Hardness+Solids+Chloramines+Sulfate+Conductivity+Organic_carbon+Trihalomethanes+Turbidity, family=binomial))
+summary(model_all)
+```
 
 Generarea unui model in functie de proprietati.
 ```{r}
@@ -121,12 +155,16 @@ Observam faptul ca valoarea lui p este destul de mare in fiecare din cazuri, cee
 
 Realizam modelul pentru cele 3 variabile alese.
 ```{r}
-(model_prp <- glm(data=water_f, Potability~Solids+Organic_carbon+Chloramines, family=binomial))
-summary(model_prp)
+(model_final <- glm(data=train, Potability~Solids+Organic_carbon+Chloramines, family=binomial))
+summary(model_final)
 ```
 Observam faptul ca proprietatea Solids este cea mai seminificativa, deoarece inregistreaza cea mai mica valoare a lui p de 0.0617. 
 
 
+```{r}
+(pred_test <- predict(model_final, newdata=test, type="response"))
+table(pred_test > 0.5, test$Potability)
+```
 
 
 
@@ -152,12 +190,8 @@ ggplot()+
 ```
 
 
-Model FINAL
-```{r}
-water_f <- drop_na(water)
-(model_final <- glm(data=water_f, Potability~ph+Hardness+Solids+Chloramines+Sulfate+Conductivity+Organic_carbon+Trihalomethanes+Turbidity, family=binomial))
-summary(model_final)
-```
+
+
 
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
