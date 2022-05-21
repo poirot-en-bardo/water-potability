@@ -27,6 +27,16 @@ summary(water)
 ```
 
 
+
+Curățarea datelor
+Eliminăm observațiile care conțin valori lipsă. În consecință, din numărul inițial de 3276 de rânduri ... 2011
+```{r}
+(water <- drop_na(water))
+```
+
+
+
+
 ---VIZUALIZAREA DATELOR---
 
 Am construit un grafic de puncte dupa proprietati si am observat ca nu e relevant, deoarece majoritatea datelor sunt concentrate in zona de mijloc.
@@ -51,7 +61,7 @@ Dorim sa vizualizam diferentele dintre variabile si care este legatura dintre cu
 water$Potability <- factor(water$Potability)
 
 water %>% group_by(Potability) %>%
-  summarize_all(~min(., na.rm = TRUE)) %>%
+  summarize_all(~min(.)) %>%
   ungroup() %>%
   #restructuram dataset - in afara de potability, preluam toate col, names_to preia de pe coloane, values_to preia din celule
   pivot_longer(!Potability, names_to = "features", values_to = "min") %>%
@@ -62,6 +72,16 @@ water %>% group_by(Potability) %>%
   facet_wrap(~features, scales = "free")
 ```
 Rezultatul obtinut poate fi interpretat astfel: in cadrul chloraminelor, duritatii, carbonului si a sulfatilor, valorile minime sunt mult mai ridicate in cazul apei nepotabile; in contrast, valorile minime ale conductivitatii, solidelor, trihalometanului si turbiditatii sunt mai ridicate pentru apa potabila; ph-ul prezinta un caz aparte, deoarce prezinta valori doar in cazul apei potabile, apa potabila avand mereu un caracter bazic, adica un ph pozitiv.
+
+
+```{r}
+water %>%
+  select_if(is.numeric) %>%
+  gather(metric, value) %>%
+  ggplot(aes(value, fill=metric)) +
+  geom_density(show.legend = FALSE) +
+  facet_wrap(~metric, scales = "free")
+```
 
 
 ---ANALIZA DATELOR---
@@ -101,7 +121,6 @@ Observam faptul ca valoarea lui p este destul de mare in fiecare din cazuri, cee
 
 Realizam modelul pentru cele 3 variabile alese.
 ```{r}
-water_f <- drop_na(water)
 (model_prp <- glm(data=water_f, Potability~Solids+Organic_carbon+Chloramines, family=binomial))
 summary(model_prp)
 ```
