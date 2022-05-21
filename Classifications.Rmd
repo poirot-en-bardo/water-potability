@@ -3,6 +3,9 @@ title: "R Notebook"
 output: html_notebook
 ---
 
+
+#SETUP
+
 ```{r}
 library(tidyverse)
 library(modelr)
@@ -12,5 +15,403 @@ library(corrplot)
 library(dplyr)
 library(magrittr)
 library(corrplot)
+library(rpart)
+library(rpart.plot)
+library(ISLR)
+library(partykit)
+library(tree)
+library(ipred)
+library(randomForest)
+library(ranger)
+
+water <- read.csv("water_quality.csv")
+data(water)
+water$ammonia <- as.numeric(water$ammonia)
+(water <- drop_na(water) %>%
+  rename(potability = is_safe))
+water <- water %>% 
+  mutate(potability = ifelse(potability == 0, "No", "Yes"))
+water <- water %>% mutate(potability = factor(potability))
+```
+
+```{r}
+water <- drop_na(water)
+```
+
+
+```{r}
+set.seed(123)
+split <- initial_split(water, prop=0.7, strata= "potability")
+train <-training(split)
+test <- testing(split)
+
+#observăm că se mentine proportia
+table(water$potability) #11.4%
+table(train$potability)
+table(test$potability)
+```
+
+
+Selectam toate atributele in afara de potability
+```{r}
+features <- setdiff(names(train), "potability")
+features
+```
+
+
+
+------------- Naive Bayes ------------------
+
+
+Separam variabilele
+```{r}
+#x sunt variabilele independente (predictori)
+#y este variabila dependenta (potabilitatea)
+x <- train[,features]
+y <- train$potability
+```
+
+
+10-fold Cross-Validation
+```{r}
+train_control <- trainControl(
+  method="cv",
+  number=10) 
+```
+
+
+
+
+Primul model
+Observăm că avem probabilități nule, ceea ce înseamnă că va trebui să adăugăm Laplace Smoothing:
+```{r}
+mod_nb1 <- train(
+  x = x,
+  y = y,
+  method = "nb",
+  trControl = train_control )
+
+mod_nb1
+```
+```{r}
+confusionMatrix(mod_nb1)
+```
+
+
+Search grid pentru a identifica parametrii optimi:
+```{r}
+search_grid <- expand.grid(
+  usekernel = c(TRUE, FALSE),
+  fL = 0.5, #la variabilele nominale sa nu porneasca de la 0
+  adjust = seq(0, 5, by = 1) ) #ajusteaza kernelii cu (1,2,3,4,5)
+
+mod_nb2 = train(
+  x = x,
+  y = y,
+  method = "nb",
+  trControl = train_control,
+  tuneGrid = search_grid     
+)
+
+mod_nb2
+```
+
+
+
+```{r}
+confusionMatrix(mod_nb2)
+```
+
+Observăm o acuratețe mai mare (90,83% vs 85,6%), deci alegem acest model.
+```{r}
+finalModel <- mod_nb2$finalModel
+```
+
+
+
+```{r}
+#predictie pe setul de test, cu probabilitatea aferenta
+pred <- predict(finalModel, test, type="prob")
+#compara predictiile cu valorile reale
+confusionMatrix(pred$class, test$potability)
+#95% CI = confidence intervals
+#no information rate (NIR) e sansa de a face clasificarea random, fara un model
+```
+
+
+
+
+
+
+
+
+------------------ Arbori de decizie ----------------------
+
+
+```{r}
+set.seed(123)
+mod_tree1 = rpart(
+  formula = potability ~. ,  
+  data = train,
+  method = "class" 
+)
+mod_tree1
+#nr instante, loss = nr erori (clasificate gresit pe clasa majoritara), clasa majoritara, probabilitatile predictiei 
+```
+
+```{r}
+summary(mod_tree1)
+#CP = cost complexity parameters
+#penalizeaza arborele pe baza nr de frunze
+```
+
+
+```{r}
+rpart.plot(mod_tree1)
+```
+
+
+```{r}
+#predictie pe test
+pred_mod_tree1 <- predict(mod_tree1, newdata = test, target ="class")
+#adaugam coloana cu no/yes
+(pred_mod_tree1 <- as_tibble(pred_mod_tree1) %>% mutate(class = ifelse(No >= Yes, "No", "Yes")))
+```
+```{r}
+confusionMatrix(factor(pred_mod_tree1$class), factor(test$potability))
+#p-value f mic --> model bun
+```
+
+Pruning
+```{r}
+set.seed(123)
+mod_tree1_pruned <- prune(mod_tree1, cp=0.005)
+mod_tree1_pruned
+
+```
+
+```{r}
+pred_m1_pruned <- predict(mod_tree1_pruned, newdata = test, target = "class")
+pred_m1_pruned <- as_tibble(pred_m1_pruned) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+confusionMatrix(factor(pred_m1_pruned$class), factor(test$potability))
+```
+
+
+Arbore netaiat
+```{r}
+m2 <- rpart(potability ~., 
+            data = train,
+            method = "class",
+            control = list(cp=0)) 
+m2
+rpart.plot(m2)
+```
+
+
+Acuratete mai buna pentru arborele netaiat:
+```{r}
+pred_m2 <- predict(m2, newdata = test, target = "class")
+pred_m2 <- as_tibble(pred_m2) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+confusionMatrix(factor(pred_m2$class), factor(test$potability))
+```
+
+
+Mai slab dupa pruning. Observăm că valoarea 0.008 pt cp (complexity parameter) e mai buna decat 0.01
+```{r}
+m2_pruned <- prune(m2, cp = 0.008)
+pred_m2_pruned <- predict(m2_pruned, newdata = test, target = "class")
+pred_m2_pruned <- as_tibble(pred_m2_pruned) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+confusionMatrix(factor(pred_m2_pruned$class), factor(test$potability))
+
+```
+
+
+
+Cu optimizarea entropiei:
+```{r}
+set.seed(123)
+m1_tree <- tree(potability ~., data = train) 
+summary(m1_tree)
+#acuratete mai mare pe setul de antrenament
+```
+
+
+```{r}
+pred_m1_tree <- predict(m1_tree, newdata = test, target = "class")
+pred_m1_tree <- as_tibble(pred_m1_tree) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+confusionMatrix(factor(pred_m1_tree$class), factor(test$potability))
+```
+
+
+Cu optimizarea coeficientului Gini
+
+```{r}
+set.seed(123)
+m1_tree_gini <- tree(potability ~., data = train, split="gini")
+summary(m1_tree_gini)
+```
+
+
+```{r}
+pred_m1_tree_gini <- predict(m1_tree_gini, newdata = test, target = "class")
+pred_m1_tree_gini <- as_tibble(pred_m1_tree_gini) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+confusionMatrix(factor(pred_m1_tree_gini$class), factor(test$potability))
+```
+
+Rezulta cele mai bune variante: arborele netaiat, urmat de arborele cu optimizarea coeficientului Gini.
+
+
+#TODO: curbe ROC pentru cele 3 metode
+
+
+
+
+
+
+------------------------- Bagging ------------------------
+
+```{r}
+set.seed(123)
+mod_bagged1 <- bagging(potability ~ .,
+                     data = train, coob = TRUE)
+mod_bagged1
+```
+Acuratetea de training = 100 - 3.82 = 96.18%
+
+
+```{r}
+pred_mod_bagged1 <- predict(mod_bagged1, newdata = test, target = "class")
+confusionMatrix(pred_mod_bagged1, factor(test$potability))
+```
+
+
+Grafic pentru stabilizarea erorii de clasificare:
+```{r}
+ntree <- seq(10, 50, by = 1)
+misclassification <- vector(mode = "numeric", length = length(ntree))
+for (i in seq_along(ntree)) {
+  set.seed(123)
+  model <- bagging( 
+    potability ~.,
+    data = train,
+    coob = TRUE,
+    nbag = ntree[i])
+  misclassification[i] = model$err
+}
+
+plot(ntree, misclassification, type="l", lwd="2")
+```
+
+Optăm pentru 36 de bags:
+
+```{r}
+mod_bagged_36 <- bagging(potability ~ .,
+                     data = train, coob = TRUE, nbag = 36)
+mod_bagged_36
+```
+
+```{r}
+pred_mod_bagged_36 <- predict(mod_bagged_36, newdata = test, target = "class")
+confusionMatrix(pred_mod_bagged_36, factor(test$potability))
+```
+
+Cea mai buna acuratete de pana acum: 96,58%.
+
+
+
+
+
+
+
+
+---------------- Random Forest ----------------------------
+
+
+
+Cu biblioteca randomForest:
+```{r}
+set.seed(123)
+mod_rf1 <- randomForest(
+  formula = potability ~ .,
+  data = train
+) #selecteaza aleatoriu 6 variabile la fiecare impartire 
+#pt ca avem 20 variabile in total si m=p/3 =11/3 aprox = 3
+mod_rf1
+```
+```{r}
+plot(mod_rf1)
+```
+
+Tuning:
+
+```{r}
+set.seed(123)
+hyper_grid <- expand.grid(
+  mtry = seq(2, 20, by = 1), # nr de atribute dintr-un split;
+  node_size = seq(3, 9, by = 2), 
+  sample_size = c(.55, .632, .7, .8),
+  OOB_ERR = 0 
+)
+
+
+for (i in 1:nrow(hyper_grid)) {
+  model <- ranger(
+    formula = potability ~ .,
+    data = train,
+    num.trees = 500, 
+    mtry = hyper_grid$mtry[i],
+    min.node.size = hyper_grid$node_size[i],
+    sample.fraction = hyper_grid$sample_size[i],
+    seed = 123
+  )
+  hyper_grid$OOB_ERR[i] <- model$prediction.error #pastreaza eroarea pentru fiecare combinatie
+}
+
+hyper_grid %>%
+  arrange(OOB_ERR) %>%
+  top_n(-10)
+```
+
+Identificam parametrii optimi: mtry = 19 atribute, node_size = 3, sample_size = 0.8
+Iteram de 100 de ori folosind combinatia optima de parametri:
+
+```{r}
+OOB_ERR <- vector(mode = "numeric", length = 100)
+for(i in seq_along(OOB_ERR)) {
+  optimal_ranger <- ranger(
+    formula         = potability ~ ., 
+    data            = train, 
+    num.trees       = 500,
+    mtry            = 19,
+    min.node.size   = 3,
+    sample.fraction = .8,
+    importance      = 'none'
+  )
+  
+  OOB_ERR[i] <- optimal_ranger$prediction.error
+}
+
+hist(OOB_ERR, breaks = 20)
+#distributa celor 100 de valori
+mean(OOB_ERR)
+```
+
+
+Predictia pe setul de test:
+```{r}
+pred_ranger <- predict(optimal_ranger, test, target ="class")  
+confusionMatrix(pred_ranger$predictions, factor(test$potability))
+```
+
+
+
+Cu caret si Cross-Validation:
+
+```{r}
+mod_rf2 <- train(potability~.,
+                data = train,
+                method = 'rf',
+                trControl = train_control)
+mod_rf2
 ```
 

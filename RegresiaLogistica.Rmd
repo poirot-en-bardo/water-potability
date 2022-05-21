@@ -16,6 +16,14 @@ library(corrplot)
 library(dplyr)
 library(magrittr)
 library(corrplot)
+library(tree)
+library(rpart)
+library(rpart.plot)
+library(ISLR)
+library(ipred)
+library(randomForest)
+library(ranger)
+library(partykit)
 ```
 
 
@@ -103,6 +111,11 @@ water %>%
   geom_density(show.legend = FALSE) +
   facet_wrap(~metric, scales = "free")
 ```
+```{r}
+water %>%
+  ggplot(aes(cadmium))+geom_density()
+```
+
 
 
 ```{r}
@@ -110,7 +123,6 @@ correlations <- cor(water[,1:20])
 # create correlation plot
 corrplot(correlations, method="circle")
 ```
-
 
 
 
