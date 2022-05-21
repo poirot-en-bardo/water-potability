@@ -21,7 +21,7 @@ library(corrplot)
 
 Incarcarea bazei de date
 ```{r}
-water <- read.csv("water_potability.csv")
+water <- read.csv("water_quality.csv")
 data(water)
 View(water)
 summary(water)
@@ -30,44 +30,61 @@ summary(water)
 
 
 Curățarea datelor
-Eliminăm observațiile care conțin valori lipsă. În consecință, din numărul inițial de 3276 de rânduri ... 2011
+
+Convertim atributul ammonia din caracter in numeric (chr to dbl).
 ```{r}
-(water <- drop_na(water))
+water$ammonia <- as.numeric(water$ammonia)
+```
+
+Eliminăm eventualele observații care conțin valori lipsă si redenumim variabila dependenta.
+```{r}
+(water <- drop_na(water) %>%
+  rename(potability = is_safe))
 ```
 
 
+
+Transformăm atributul potability in factor:
+```{r}
+water <- water %>% 
+  mutate(potability = ifelse(potability == 0, "No", "Yes"))
+water <- water %>% mutate(potability = factor(potability))
+table(water$potability)
+```
 
 
 ---VIZUALIZAREA DATELOR---
 
 Am construit un grafic de puncte dupa proprietati si am observat ca nu e relevant, deoarece majoritatea datelor sunt concentrate in zona de mijloc.
+
+#TODO change variables 
 ```{r}
-water %>% ggplot(aes(x=ph,y=Sulfate,color=Potability))+
+water %>% ggplot(aes(x=ph,y=Sulfate,color=potability))+
   geom_point()
-water %>% ggplot(aes(x=Sulfate,y=Hardness,color=Potability))+
+water %>% ggplot(aes(x=Sulfate,y=Hardness,color=potability))+
   geom_point()
-water %>% ggplot(aes(x=Trihalomethanes,y=Chloramines,color=Potability))+
+water %>% ggplot(aes(x=Trihalomethanes,y=Chloramines,color=potability))+
   geom_point()
 ```
 
 Grupam datele dupa variabila tinta Potabilitate. Observam ca avem mai multe date pentru valoarea 0, deci mai multe date pentru apa nepotabila.
 ```{r}
-by_Potability <- group_by(water, Potability)
-summarize(by_Potability, count=n())
+by_potability <- group_by(water, potability)
+summarize(by_potability, count=n())
 ```
 
 
 Dorim sa vizualizam diferentele dintre variabile si care este legatura dintre cu variabila tinta, astfel ca afisam un grafic ce ilustreaza situatia pentru fiecare proprietate a apei in parte. Am utilizat valorile minime pentru fiecare variabila ca si termen de comparatie.
-```{r}
-water$Potability <- factor(water$Potability)
 
-water %>% group_by(Potability) %>%
-  summarize_all(~min(.)) %>%
+```{r}
+
+water %>% group_by(potability) %>%
+  summarize_all(~mean(.)) %>%
   ungroup() %>%
   #restructuram dataset - in afara de potability, preluam toate col, names_to preia de pe coloane, values_to preia din celule
-  pivot_longer(!Potability, names_to = "features", values_to = "min") %>%
+  pivot_longer(!potability, names_to = "features", values_to = "min") %>%
   #cream graficul pe orizontala prop, pe vert valori min)
-  ggplot(aes(features, min, fill = Potability)) +
+  ggplot(aes(features, min, fill = potability)) +
   #design-ul graficului
   geom_bar(stat = "identity", position = "dodge") +
   facet_wrap(~features, scales = "free")
@@ -77,6 +94,7 @@ Rezultatul obtinut poate fi interpretat astfel: in cadrul chloraminelor, duritat
 
 ```{r}
 water %>%
+  filter(potability == "Yes") %>%
   select_if(is.numeric) %>%
   gather(metric, value) %>%
   ggplot(aes(value, fill=metric)) +
@@ -86,7 +104,7 @@ water %>%
 
 
 ```{r}
-correlations <- cor(water[,1:9])
+correlations <- cor(water[,1:20])
 # create correlation plot
 corrplot(correlations, method="circle")
 ```
@@ -100,10 +118,9 @@ corrplot(correlations, method="circle")
 ```{r}
 #
 set.seed(123)
-split <- initial_split(water, prop=0.7, strata= "Potability")
+split <- initial_split(water, prop=0.7, strata= "potability")
 train <-training(split)
 test <- testing(split)
-summarize(by_Potability, count=n())
 ```
 
 
@@ -115,38 +132,37 @@ summarize(by_Potability, count=n())
 
 Generarea unui model in functie de toate proprietatile.
 ```{r}
-water_f <- drop_na(water)
-(model_all <- glm(data=water_f, Potability~ph+Hardness+Solids+Chloramines+Sulfate+Conductivity+Organic_carbon+Trihalomethanes+Turbidity, family=binomial))
+(model_all <- glm(data=water_f, potability~ph+Hardness+Solids+Chloramines+Sulfate+Conductivity+Organic_carbon+Trihalomethanes+Turbidity, family=binomial))
 summary(model_all)
 ```
 
 Generarea unui model in functie de proprietati.
 ```{r}
-model_ph<-glm(data=water, Potability ~ ph, family=binomial)
+model_ph<-glm(data=water, potability ~ ph, family=binomial)
 summary(model_ph)
 
-model_hard<-glm(data=water, Potability ~ Hardness, family=binomial)
+model_hard<-glm(data=water, potability ~ Hardness, family=binomial)
 summary(model_hard)
 
-model_sol<-glm(data=water, Potability ~ Solids, family=binomial)
+model_sol<-glm(data=water, potability ~ Solids, family=binomial)
 summary(model_sol)
 
-model_ch<-glm(data=water, Potability ~ Chloramines, family=binomial)
+model_ch<-glm(data=water, potability ~ Chloramines, family=binomial)
 summary(model_ch)
 
-model_sulf<-glm(data=water, Potability ~ Sulfate, family=binomial)
+model_sulf<-glm(data=water, potability ~ Sulfate, family=binomial)
 summary(model_sulf)
 
-model_cond<-glm(data=water, Potability ~ Conductivity, family=binomial)
+model_cond<-glm(data=water, potability ~ Conductivity, family=binomial)
 summary(model_cond)
 
-model_org<-glm(data=water, Potability ~ Organic_carbon, family=binomial)
+model_org<-glm(data=water, potability ~ Organic_carbon, family=binomial)
 summary(model_org)
 
-model_thr<-glm(data=water, Potability ~ Trihalomethanes, family=binomial)
+model_thr<-glm(data=water, potability ~ Trihalomethanes, family=binomial)
 summary(model_thr)
 
-model_trb<-glm(data=water, Potability ~ Turbidity, family=binomial)
+model_trb<-glm(data=water, potability ~ Turbidity, family=binomial)
 summary(model_trb)
 
 ```
@@ -155,7 +171,7 @@ Observam faptul ca valoarea lui p este destul de mare in fiecare din cazuri, cee
 
 Realizam modelul pentru cele 3 variabile alese.
 ```{r}
-(model_final <- glm(data=train, Potability~Solids+Organic_carbon+Chloramines, family=binomial))
+(model_final <- glm(data=train, potability~Solids+Organic_carbon+Chloramines, family=binomial))
 summary(model_final)
 ```
 Observam faptul ca proprietatea Solids este cea mai seminificativa, deoarece inregistreaza cea mai mica valoare a lui p de 0.0617. 
@@ -163,7 +179,7 @@ Observam faptul ca proprietatea Solids este cea mai seminificativa, deoarece inr
 
 ```{r}
 (pred_test <- predict(model_final, newdata=test, type="response"))
-table(pred_test > 0.5, test$Potability)
+table(pred_test > 0.5, test$potability)
 ```
 
 
