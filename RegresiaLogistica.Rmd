@@ -53,17 +53,19 @@ table(water$potability)
 ```
 
 
+
+
 ---VIZUALIZAREA DATELOR---
 
 Am construit un grafic de puncte dupa proprietati si am observat ca nu e relevant, deoarece majoritatea datelor sunt concentrate in zona de mijloc.
 
 #TODO change variables 
 ```{r}
-water %>% ggplot(aes(x=ph,y=Sulfate,color=potability))+
+water %>% ggplot(aes(x=silver,y=perchlorate,color=potability))+
   geom_point()
-water %>% ggplot(aes(x=Sulfate,y=Hardness,color=potability))+
+water %>% ggplot(aes(x=arsenic,y=cadmium,color=potability))+
   geom_point()
-water %>% ggplot(aes(x=Trihalomethanes,y=Chloramines,color=potability))+
+water %>% ggplot(aes(x=aluminium,y=ammonia,color=potability))+
   geom_point()
 ```
 
