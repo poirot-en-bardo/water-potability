@@ -230,7 +230,7 @@ Observând rezultatele obținute, am descoperit faptul ca variabilele sunt relev
 
 
 Crearea modelelor pe date specifice
---Primul model creat pe toate variabilele 
+1. Primul model creat pe toate variabilele 
 ```{r}
 (model_final <- glm(data=train, potability~aluminium+barium+chloramine+chromium+silver+copper+nitrites+perchlorate+radium+ammonia+arsenic+cadmium+bacteria+viruses+lead+nitrates+mercury+selenium+uranium+flouride, family=binomial))
 
@@ -248,7 +248,7 @@ pred_mx <- predict(model_final, newdata=test)
 
 ```
 
---Modelul 2 s-a realizat pe variabilele independente cu o relatie directa cu variabila dependenta
+2. Modelul 2 s-a realizat pe variabilele independente cu o relatie directa cu variabila dependenta
 ```{r}
 model_2 <- glm(data=train, potability~aluminium+barium+chloramine+chromium+copper, family=binomial)
 summary(model_2)
@@ -260,7 +260,7 @@ table(pred_test_2 > 0.3, test$potability)
 ```
 
 
---Modelul 3 s-a realizat pe variabilele independente cu o relatie indirecta cu variabila dependenta
+3. Modelul 3 s-a realizat pe variabilele independente cu o relatie indirecta cu variabila dependenta
 ```{r}
 model_3 <- glm(data=train, potability~arsenic+cadmium+mercury+selenium+uranium, family=binomial)
 summary(model_3)
@@ -300,7 +300,7 @@ specificity <- c(conf1$byClass['Specificity'], conf2$byClass['Specificity'], con
 performance <- data.frame(model, accuracy, sensitivity, specificity)
 performance
 ```
-
+In urma rezultatelor obtinute, alegem ca model reprezentativ modelul obtinut prin cross-validation (model_cv_lr), deoarece prezinta o acuratete ridicata, cât și o rată a specificității ridicată. Deși acuratețea primului model este mai ridicată, procentul nu e semnificativ, specificitatea e redusa, de aceea am ales ultimul model in detrimentului primului.
 
 
 
