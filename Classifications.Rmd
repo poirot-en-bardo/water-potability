@@ -4,7 +4,7 @@ output: html_notebook
 ---
 
 
-#SETUP
+## Data Setup
 
 ```{r}
 library(tidyverse)
@@ -24,6 +24,7 @@ library(ipred)
 library(randomForest)
 library(ranger)
 library(pROC)
+library(ggplot2)
 
 water <- read.csv("water_quality.csv")
 data(water)
@@ -59,11 +60,6 @@ features <- setdiff(names(train), "potability")
 features
 ```
 
-
-
-------------- Naive Bayes ------------------
-
-
 Separam variabilele
 ```{r}
 #x sunt variabilele independente (predictori)
@@ -81,10 +77,16 @@ train_control <- trainControl(
 ```
 
 
+__________________________________________________________________________________________
+
+## Naive Bayes 
 
 
-Primul model
-Observăm că avem probabilități nule, ceea ce înseamnă că va trebui să adăugăm Laplace Smoothing:
+
+
+
+
+1. Primul model, realizat cu Cross-Validation:
 ```{r}
 mod_nb1 <- train(
   x = x,
@@ -105,7 +107,11 @@ search_grid <- expand.grid(
   usekernel = c(TRUE, FALSE),
   fL = 0.5, #la variabilele nominale sa nu porneasca de la 0
   adjust = seq(0, 5, by = 1) ) #ajusteaza kernelii cu (1,2,3,4,5)
+```
 
+2. Model cu optimizarea parametrilor:
+
+```{r}
 mod_nb2 = train(
   x = x,
   y = y,
@@ -118,23 +124,22 @@ mod_nb2
 ```
 
 
-
 ```{r}
 confusionMatrix(mod_nb2)
 ```
 
-Observăm o acuratețe mai mare (90,83% vs 85,6%), deci alegem acest model.
+Observăm o acuratețe net mai mare (90,83% vs 85,6%), deci alegem acest model.
 ```{r}
-finalModel <- mod_nb2$finalModel
+best_nb <- mod_nb2$finalModel
 ```
 
 
 
 ```{r}
 #predictie pe setul de test, cu probabilitatea aferenta
-pred <- predict(finalModel, test, type="prob")
+pred_nb <- predict(best_nb, test, type="prob")
 #compara predictiile cu valorile reale
-confusionMatrix(pred$class, test$potability)
+confusionMatrix(pred_nb$class, test$potability)
 #95% CI = confidence intervals
 #no information rate (NIR) e sansa de a face clasificarea random, fara un model
 ```
@@ -369,7 +374,7 @@ performance
 Vom selecta modelul bagged2 drept cel mai performant:
 
 ```{r}
-bagged_best <- mod_bagged_36
+best_bagged <- mod_bagged_36
 ```
 
 
@@ -483,10 +488,10 @@ pred_rf_tuned <- predict(mod_rf_tuned, test, type = "prob")
 
 Realizam graficul curbelor ROC pentru cele 3 modele:
 ```{r}
-dataset <- data.frame(actual.class = test$potability, probability = pred_rf1_roc, pred_rf2_roc, pred_rf_tuned)
-roc_rf1 <- roc(actual.class~pred_rf1_roc[,1], dataset)
-roc_rf2 <- roc(actual.class~pred_rf2_roc[,1], dataset)
-roc_rf_tuned <- roc(actual.class~pred_rf_tuned[,1], dataset)
+data_frame <- data.frame(actual.class = test$potability, probability = pred_rf1_roc, pred_rf2_roc, pred_rf_tuned)
+roc_rf1 <- roc(actual.class~pred_rf1_roc[,1], data_frame)
+roc_rf2 <- roc(actual.class~pred_rf2_roc[,1], data_frame)
+roc_rf_tuned <- roc(actual.class~pred_rf_tuned[,1], data_frame)
 
 
 df1 <- data.frame(
@@ -504,13 +509,13 @@ df3 <- data.frame(
 ggplot() + 
   geom_line(df1, mapping = aes(x= specificity1, y = sensitivity1), color = "dark green") + 
   scale_x_reverse() +
-  theme(text = element_text(size = 20))+
+  theme(text = element_text(size = 15))+
 geom_line(df2, mapping = aes(x = specificity2, y = sensitivity2), color = "blue") + 
   scale_x_reverse() +
-  theme(text = element_text(size = 20))+
+  theme(text = element_text(size = 15))+
 geom_line(df3, mapping = aes(x = specificity3, y = sensitivity3), color = "orange") + 
   scale_x_reverse() +
-  theme(text = element_text(size = 20))+
+  theme(text = element_text(size = 15))+
 labs(
   title = 'ROC - Modele Random Forest',
   x = 'specificitate',
@@ -531,7 +536,7 @@ performance
 Vom alege modelul rf_tuned drept cel mai bun Random Forest.
 
 ```{r}
-rf_best <- mod_rf_tuned
+best_rf <- mod_rf_tuned
 ```
 
 
@@ -547,5 +552,89 @@ rf_best <- mod_rf_tuned
 ------------------- Evaluare Curbe ROC -----------------------
 
 ```{r}
-summary(pred_mod_bagged1)
+pred_nb_roc <- predict(best_nb, test, type = "prob")  
+pred_tree_roc <- predict(best_tree, test, target = "class")
+pred_bagged_roc <- predict(best_bagged, test, type = "prob")
+pred_rf_roc <- predict(best_rf, test, type = "prob")
+
+
+df_roc <- data.frame(actual.class = test$potability, probability = pred_nb_roc, pred_tree_roc, pred_bagging_roc, pred_rf_roc)
+roc_nb <- roc(actual.class~pred_nb_roc$posterior[,1], df_roc)
+roc_tree <- roc(actual.class~pred_tree_roc[,1], df_roc)
+roc_bagged <- roc(actual.class~pred_bagged_roc[,1], df_roc)
+roc_rf <- roc(actual.class~pred_rf_roc[,1], df_roc)
+
+
+df_lr <- data.frame(
+  specificity1 <- roc_nb$specificities, 
+  sensitivity1 <- roc_nb$sensitivities)
+
+df_nb <- data.frame(
+  specificity2 <- roc_nb$specificities, 
+  sensitivity2 <- roc_nb$sensitivities)
+
+df_tree <- data.frame(
+  specificity3 <- roc_tree$specificities, 
+  sensitivity3 <- roc_tree$sensitivities)
+
+df_bag <- data.frame(
+  specificity4 <- roc_bagged$specificities, 
+  sensitivity4 <- roc_bagged$sensitivities)
+
+df_rf <- data.frame(
+  specificity5 <- roc_rf$specificities, 
+  sensitivity5 <- roc_rf$sensitivities)
+
+colors <- c("Regresie Logistica" = "orange", "Naive Bayes" = "yellow", "Decision Tree" = "dark green", "Bagging" = "red", "Random Forest" = "blue")
+
+ggplot() + 
+  geom_line(df_lr, mapping = aes(x= specificity1, y = sensitivity1, color = "Regresie Logistica")) +
+  scale_x_reverse() +
+  theme(text = element_text(size = 15))+
+geom_line(df_nb, mapping = aes(x = specificity2, y = sensitivity2, color = "Naive Bayes")) + 
+  scale_x_reverse() +
+  theme(text = element_text(size = 15))+
+geom_line(df_tree, mapping = aes(x = specificity3, y = sensitivity3, color = "Decision Tree")) + 
+  scale_x_reverse() +
+  theme(text = element_text(size = 15))+
+geom_line(df_bag, mapping = aes(x = specificity4, y = sensitivity4, color = "Bagging")) + 
+  scale_x_reverse() +
+  theme(text = element_text(size = 15))+
+geom_line(df_rf, mapping = aes(x = specificity5, y = sensitivity5, color = "Random Forest")) + 
+  scale_x_reverse() +
+  theme(text = element_text(size = 15))+
+labs(
+  title = 'ROC - Modele  de clasificare',
+  x = 'specificitate',
+  y = 'senzitivitate',
+  color = 'Model')+
+  scale_color_manual(values = colors)
 ```
+
+
+```{r}
+#cm_lr <- confusionMatrix(pred_mod_lr, factor(test$potability))
+cm_nb <- confusionMatrix(pred_nb_roc$class, factor(test$potability))
+pred_tree_roc <- as_tibble(pred_tree_roc) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+cm_tree <- confusionMatrix(factor(pred_tree_roc$class), factor(test$potability))
+pred_bagged_roc <- as_tibble(pred_bagged_roc) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+cm_bag <- confusionMatrix(factor(pred_bagged_roc$class), factor(test$potability))
+pred_rf_roc <- as_tibble(pred_rf_roc) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+cm_rf <- confusionMatrix(factor(pred_rf_roc$class), factor(test$potability))
+
+```
+
+
+```{r}
+model <- c('nb','tree','bagging','rf')
+auc <- c(auc(roc_nb), auc(roc_tree), auc(roc_bagged), auc(roc_rf))
+accuracy <- c(cm_nb$overall['Accuracy'], cm_tree$overall['Accuracy'], cm_bag$overall['Accuracy'],cm_rf$overall['Accuracy'])
+sensitivity <- c(cm_nb$byClass['Sensitivity'], cm_tree$byClass['Sensitivity'], cm_bag$byClass['Sensitivity'],cm_rf$byClass['Sensitivity'])
+specificity <- c(cm_nb$byClass['Specificity'], cm_tree$byClass['Specificity'], cm_bag$byClass['Specificity'], cm_rf$byClass['Specificity'])
+performance <- data.frame(model, accuracy, auc, sensitivity, specificity)
+performance %>% arrange(desc(accuracy), desc(auc))
+```
+
+
+În concluzie, cea mai bună predicție de clasificare se obține prin utilizarea modelului Random Forest. Ordinea performanței este cea din tabelul de mai sus.
+
