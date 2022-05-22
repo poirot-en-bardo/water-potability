@@ -1,6 +1,8 @@
 ---
 title: "Clasificarea potabilității apei"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 
@@ -458,20 +460,19 @@ rpart.plot(mod_tree_full)
 
 Acuratete mai buna pentru arborele netaiat:
 ```{r}
-pred_m2 <- predict(m2, newdata = test, target = "class")
-pred_m2 <- as_tibble(pred_m2) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
-(cmt2 <- confusionMatrix(factor(pred_m2$class), factor(test$potability)))
+pred_tree_full <- predict(mod_tree_full, newdata = test, target = "class")
+pred_tree_full <- as_tibble(pred_tree_full) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+(cmt2 <- confusionMatrix(factor(pred_tree_full$class), factor(test$potability)))
 ```
 
 
 3. Pruning: 
 
 ```{r}
-m2_pruned <- prune(m2, cp = 0.005)
+m2_pruned <- prune(mod_tree_full, cp = 0.005)
 pred_m2_pruned <- predict(m2_pruned, newdata = test, target = "class")
 pred_m2_pruned <- as_tibble(pred_m2_pruned) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
 (cmt3 <- confusionMatrix(factor(pred_m2_pruned$class), factor(test$potability)))
-
 ```
 
 
