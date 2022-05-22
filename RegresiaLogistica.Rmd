@@ -115,6 +115,13 @@ Rezultatul obtinut poate fi interpretat astfel: in cadrul chloraminelor, duritat
 
 
 ```{r}
+ggplot(water, aes(features, min, fill = water$potability))+
+  geom_boxplot(stat = "identity",position = "dodge")+
+  facet_wrap(~features, scales = "free")
+```
+
+
+```{r}
 water %>%
   filter(potability == "Yes") %>%
   select_if(is.numeric) %>%

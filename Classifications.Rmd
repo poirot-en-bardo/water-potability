@@ -1,10 +1,10 @@
 ---
-title: "R Notebook"
+title: "Clasificarea potabilității apei"
 output: html_notebook
 ---
 
 
-## Data Setup
+- Încărcarea bibliotecilor necesare în proiect:
 
 ```{r}
 library(tidyverse)
@@ -25,42 +25,131 @@ library(randomForest)
 library(ranger)
 library(pROC)
 library(ggplot2)
+library(reshape2)
+```
 
+
+
+- Încărcarea bazei de date:
+```{r}
 water <- read.csv("water_quality.csv")
 data(water)
+summary(water)
+```
+
+
+
+- Curățarea datelor
+
+Convertim atributul ammonia din caracter in numeric (chr to dbl).
+```{r}
 water$ammonia <- as.numeric(water$ammonia)
+```
+
+Eliminăm eventualele observații care conțin valori lipsă si redenumim variabila dependenta.
+```{r}
 (water <- drop_na(water) %>%
   rename(potability = is_safe))
+```
+
+
+
+Transformăm atributul potability in factor:
+```{r}
 water <- water %>% 
   mutate(potability = ifelse(potability == 0, "No", "Yes"))
 water <- water %>% mutate(potability = factor(potability))
+table(water$potability)
 ```
+
+
+_______________________________________________________________________________
+
+## Vizualizarea datelor
+
 
 ```{r}
-water <- drop_na(water)
+water %>% ggplot(aes(x=silver,y=perchlorate,color=potability))+
+  geom_point()
+water %>% ggplot(aes(x=aluminium,y=cadmium,color=potability))+
+  geom_point()
+water %>% ggplot(aes(x=aluminium,y=barium,color=potability))+
+  geom_point()
+```
+
+Grupam datele dupa variabila tinta potabilitate. Observam ca avem mai multe date pentru valoarea No, deci mai multe date pentru apa nepotabila.
+```{r}
+by_potability <- group_by(water, potability)
+summarize(by_potability, count=n())
 ```
 
 
+- Vizualizarea valorilor medii ale fiecărei variabile, comparativ pentru apa potabilă și nepotabilă:    
+
+```{r}
+
+water %>% group_by(potability) %>%
+  summarize_all(~mean(.)) %>%
+  ungroup() %>%
+  #restructuram dataset - in afara de potability, preluam toate col, names_to preia de pe coloane, values_to preia din celule
+  pivot_longer(!potability, names_to = "features", values_to = "min") %>%
+  #cream graficul pe orizontala prop, pe vert valori min)
+  ggplot(aes(features, min, fill = potability)) +
+  #design-ul graficului
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~features, scales = "free")
+```
+
+
+```{r}
+water.m <- melt(water, id.var = "potability")
+p <- ggplot(data = water.m, aes(x=variable, y=value)) + 
+             geom_boxplot(aes(fill=potability))
+p + facet_wrap( ~ variable, scale="free")
+```
+- Distributia valorilor fiecărei variabile pentru apa nepotabilă (digrame de densitate):
+
+```{r}
+water %>%
+  filter(potability == "No") %>%
+  select_if(is.numeric) %>%
+  gather(metric, value) %>%
+  ggplot(aes(value, fill=metric)) +
+  geom_density(show.legend = FALSE) +
+  facet_wrap(~metric, scales = "free")
+```
+
+- Matricea de corelație între proprietățile chimice:
+
+```{r}
+correlations <- cor(water[,1:20])
+# create correlation plot
+corrplot(correlations, method="circle")
+```
+
+
+
+
+
+
+## Împărțirea datelor 
+
+Împărțim datele în set de antrenare și de test:
 ```{r}
 set.seed(123)
 split <- initial_split(water, prop=0.7, strata= "potability")
 train <-training(split)
 test <- testing(split)
-
-#observăm că se mentine proportia
-table(water$potability) #11.4%
-table(train$potability)
-table(test$potability)
 ```
 
 
-Selectam toate atributele in afara de potability
+Selectăm în features toate atributele în afară de potability:
 ```{r}
 features <- setdiff(names(train), "potability")
 features
 ```
 
-Separam variabilele
+Separăm variabilele
 ```{r}
 #x sunt variabilele independente (predictori)
 #y este variabila dependenta (potabilitatea)
@@ -79,6 +168,157 @@ train_control <- trainControl(
 
 __________________________________________________________________________________________
 
+## Regresie Logistică
+
+Generarea câte unui model in funcție de proprietati:
+```{r}
+model_al<-glm(data=water, potability ~ aluminium, family=binomial)
+summary(model_al)$coefficients 
+
+model_am<-glm(data=water, potability ~ ammonia, family=binomial)
+summary(model_am)$coefficients
+
+model_ar<-glm(data=water, potability ~ arsenic, family=binomial)
+summary(model_ar)$coefficients
+
+model_br<-glm(data=water, potability ~ barium, family=binomial)
+summary(model_br)$coefficients
+
+model_cd<-glm(data=water, potability ~ cadmium, family=binomial)
+summary(model_cd)$coefficients
+
+model_cl<-glm(data=water, potability ~ chloramine, family=binomial)
+summary(model_cl)$coefficients
+
+model_cr<-glm(data=water, potability ~ chromium, family=binomial)
+summary(model_cr)$coefficients
+
+model_cp<-glm(data=water, potability ~ copper, family=binomial)
+summary(model_cp)$coefficients
+
+model_fl<-glm(data=water, potability ~ flouride, family=binomial)
+summary(model_fl)$coefficients
+
+model_bc<-glm(data=water, potability ~ bacteria, family=binomial)
+summary(model_bc)$coefficients
+
+model_vs<-glm(data=water, potability ~ viruses, family=binomial)
+summary(model_vs)$coefficients
+
+model_ld<-glm(data=water, potability ~ lead, family=binomial)
+summary(model_ld)$coefficients
+
+model_na<-glm(data=water, potability ~ nitrates, family=binomial)
+summary(model_na)$coefficients
+
+model_ni<-glm(data=water, potability ~ nitrites, family=binomial)
+summary(model_ni)$coefficients
+
+model_mc<-glm(data=water, potability ~ mercury, family=binomial)
+summary(model_mc)$coefficients
+
+model_pc<-glm(data=water, potability ~ perchlorate, family=binomial)
+summary(model_pc)$coefficients
+
+model_rd<-glm(data=water, potability ~ radium, family=binomial)
+summary(model_rd)$coefficients
+
+model_sl<-glm(data=water, potability ~ selenium, family=binomial)
+summary(model_sl)$coefficients
+
+model_sv<-glm(data=water, potability ~ silver, family=binomial)
+summary(model_sv)$coefficients
+
+model_ur<-glm(data=water, potability ~ uranium, family=binomial)
+summary(model_ur)$coefficients  
+```
+Observând rezultatele obținute, am descoperit faptul ca variabilele sunt relevante, mai putin florul, care are o valoare mare a lui p. 
+
+
+Crearea modelelor pe date specifice
+1. Primul model creat pe toate variabilele 
+```{r}
+(model_final <- glm(data=train, potability~aluminium+barium+chloramine+chromium+silver+copper+nitrites+perchlorate+radium+ammonia+arsenic+cadmium+bacteria+viruses+lead+nitrates+mercury+selenium+uranium+flouride, family=binomial))
+
+```
+Observam faptul ca proprietatea aluminium este cea mai seminificativa, deoarece inregistreaza cea mai mica valoare a lui p, <2e-16. 
+
+
+Considerăm valoarea de 0.3 drept prag pentru clasificarea in Yes/No:
+```{r}
+pred_mx <- predict(model_final, newdata=test)
+(conf1 <- confusionMatrix(factor(ifelse(pred_mx>0.3, "Yes", "No")), factor(test$potability)))
+
+```
+
+2. Modelul 2 s-a realizat pe variabilele independente cu o relatie directa determinantă cu variabila dependenta:
+```{r}
+model_2 <- glm(data=train, potability~aluminium+barium+chloramine+chromium+copper, family=binomial)
+summary(model_2)
+```
+```{r}
+pred_test_2 <- predict(model_2, newdata=test, type="response")
+(conf2 <- confusionMatrix(factor(ifelse(pred_test_2>0.3, "Yes", "No")), factor(test$potability)))
+```
+
+
+3. Modelul 3 s-a realizat pe variabilele independente cu o relatie indirecta cu variabila dependenta:
+```{r}
+model_3 <- glm(data=train, potability~arsenic+cadmium+mercury+selenium+uranium, family=binomial)
+summary(model_3)
+```
+
+```{r}
+pred_test_3 <- predict(model_3, newdata=test, type="response")
+(conf3 <- confusionMatrix(factor(ifelse(pred_test_3>0.3, "Yes", "No")), factor(test$potability)))
+```
+
+
+4. Model folosind Cross-Validation:
+```{r}
+model_cv_lr  <- train (
+  x=x,
+  y=y,
+  method="glm",
+  family="binomial",
+  trControl = train_control
+)
+model_cv_lr
+
+```
+
+```{r}
+pred_cv_lr = predict (model_cv_lr, newdata=test, type="raw")
+(conf4 <- confusionMatrix(pred_cv_lr, test$potability))
+```
+
+
+Tabel comparativ:  
+
+```{r}
+model <- c('model_final','model_2','model_3', 'model_cv_lr')
+accuracy <- c(conf1$overall['Accuracy'], conf2$overall['Accuracy'], conf3$overall['Accuracy'], conf4$overall['Accuracy'])
+sensitivity <- c(conf1$byClass['Sensitivity'], conf2$byClass['Sensitivity'], conf3$byClass['Sensitivity'], conf4$byClass['Sensitivity'])
+specificity <- c(conf1$byClass['Specificity'], conf2$byClass['Specificity'], conf3$byClass['Specificity'], conf4$byClass['Specificity'])
+performance <- data.frame(model, accuracy, sensitivity, specificity)
+performance
+```
+In urma rezultatelor obtinute, alegem ca model reprezentativ modelul obtinut prin cross-validation (model_cv_lr), deoarece prezinta o acuratete ridicata, cât și o rată a specificității ridicată. Deși acuratețea primului model este mai ridicată, procentul nu e semnificativ, specificitatea e redusa, de aceea am ales ultimul model in detrimentului primului.
+
+```{r}
+best_lr <- model_cv_lr
+```
+
+
+
+
+
+
+
+
+
+________________________________________________________________________________
+
 ## Naive Bayes 
 
 
@@ -87,15 +327,17 @@ ________________________________________________________________________________
 
 
 1. Primul model, realizat cu Cross-Validation:
-```{r}
+```{r warning = FALSE}
 mod_nb1 <- train(
   x = x,
   y = y,
   method = "nb",
   trControl = train_control )
-
 mod_nb1
 ```
+
+
+
 ```{r}
 confusionMatrix(mod_nb1)
 ```
@@ -111,7 +353,7 @@ search_grid <- expand.grid(
 
 2. Model cu optimizarea parametrilor:
 
-```{r}
+```{r warning = FALSE}
 mod_nb2 = train(
   x = x,
   y = y,
@@ -152,7 +394,7 @@ confusionMatrix(pred_nb$class, test$potability)
 
 
 
-__________________________________________________________________________________________
+________________________________________________________________________________________
 
 ## Arbori de decizie 
 
@@ -474,7 +716,7 @@ pred_mod_rf2 <- predict(mod_rf2, test, target ="class")
 
 
 
-
+  
 
 
 ## Evaluarea performantei modelelor:
@@ -551,22 +793,23 @@ best_rf <- mod_rf_tuned
 ### Evaluare Curbe ROC 
 
 ```{r}
+pred_lr_roc <- predict(best_lr, test, type = "prob")  
 pred_nb_roc <- predict(best_nb, test, type = "prob")  
 pred_tree_roc <- predict(best_tree, test, target = "class")
 pred_bagged_roc <- predict(best_bagged, test, type = "prob")
 pred_rf_roc <- predict(best_rf, test, type = "prob")
 
 
-df_roc <- data.frame(actual.class = test$potability, probability = pred_nb_roc, pred_tree_roc, pred_bagging_roc, pred_rf_roc)
+df_roc <- data.frame(actual.class = test$potability, probability = pred_lr_roc, pred_nb_roc, pred_tree_roc, pred_bagging_roc, pred_rf_roc)
+roc_lr <- roc(actual.class~pred_lr_roc[,1], df_roc)
 roc_nb <- roc(actual.class~pred_nb_roc$posterior[,1], df_roc)
 roc_tree <- roc(actual.class~pred_tree_roc[,1], df_roc)
 roc_bagged <- roc(actual.class~pred_bagged_roc[,1], df_roc)
 roc_rf <- roc(actual.class~pred_rf_roc[,1], df_roc)
 
-
 df_lr <- data.frame(
-  specificity1 <- roc_nb$specificities, 
-  sensitivity1 <- roc_nb$sensitivities)
+  specificity1 <- roc_lr$specificities, 
+  sensitivity1 <- roc_lr$sensitivities)
 
 df_nb <- data.frame(
   specificity2 <- roc_nb$specificities, 
@@ -614,10 +857,11 @@ labs(
 
 Matricele de confuzie pentru extragerea masurilor de evaluare a performantei:
 ```{r}
-#cm_lr <- confusionMatrix(pred_mod_lr, factor(test$potability))
+pred_lr_roc <- as_tibble(pred_lr_roc) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+cm_lr <- confusionMatrix(factor(pred_lr_roc$class), factor(test$potability))
+
 cm_nb <- confusionMatrix(pred_nb_roc$class, factor(test$potability))
 
-pred_tree_roc
 pred_tree_roc <- as_tibble(pred_tree_roc) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
 cm_tree <- confusionMatrix(factor(pred_tree_roc$class), factor(test$potability))
 
@@ -632,12 +876,18 @@ cm_rf <- confusionMatrix(factor(pred_rf_roc$class), factor(test$potability))
 
 Tabelul cu parametrii de evaluare aferenti fiecarui model, ordonat dupa acuratețe si AUC:
 ```{r}
-model <- c('nb','tree','bagging','rf')
-auc <- c(auc(roc_nb), auc(roc_tree), auc(roc_bagged), auc(roc_rf))
-accuracy <- c(cm_nb$overall['Accuracy'], cm_tree$overall['Accuracy'], cm_bag$overall['Accuracy'],cm_rf$overall['Accuracy'])
-sensitivity <- c(cm_nb$byClass['Sensitivity'], cm_tree$byClass['Sensitivity'], cm_bag$byClass['Sensitivity'],cm_rf$byClass['Sensitivity'])
-specificity <- c(cm_nb$byClass['Specificity'], cm_tree$byClass['Specificity'], cm_bag$byClass['Specificity'], cm_rf$byClass['Specificity'])
-performance <- data.frame(model, accuracy, auc, sensitivity, specificity)
+model <- c('lr','nb','tree','bagging','rf')
+auc <- c(auc(roc_lr), auc(roc_nb), auc(roc_tree), auc(roc_bagged), auc(roc_rf))
+
+accuracy <- c(cm_lr$overall['Accuracy'], cm_nb$overall['Accuracy'], cm_tree$overall['Accuracy'], cm_bag$overall['Accuracy'],cm_rf$overall['Accuracy'])
+
+sensitivity <- c(cm_lr$byClass['Sensitivity'], cm_nb$byClass['Sensitivity'], cm_tree$byClass['Sensitivity'], cm_bag$byClass['Sensitivity'],cm_rf$byClass['Sensitivity'])
+
+specificity <- c(cm_lr$byClass['Specificity'], cm_nb$byClass['Specificity'], cm_tree$byClass['Specificity'], cm_bag$byClass['Specificity'], cm_rf$byClass['Specificity'])
+
+p_value <- c(cm_lr$overall['AccuracyPValue'], cm_nb$overall['AccuracyPValue'], cm_tree$overall['AccuracyPValue'], cm_bag$overall['AccuracyPValue'],cm_rf$overall['AccuracyPValue'])
+
+performance <- data.frame(model, accuracy, auc, sensitivity, specificity, p_value)
 performance %>% arrange(desc(accuracy), desc(auc))
 ```
 
