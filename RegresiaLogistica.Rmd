@@ -147,13 +147,22 @@ set.seed(123)
 split <- initial_split(water, prop=0.7, strata= "potability")
 train <-training(split)
 test <- testing(split)
+
+features <- setdiff(names(train), "potability")
+x <- train[,features]
+y <- train$potability
+
+train_control <- trainControl(
+  method="cv",
+  number=10
+)
 ```
 
 
 
 
 
----ANALIZA DATELOR---
+---LOGISTOC REGRESSION---
 
 Generarea unui model in functie de proprietati.
 ```{r}
@@ -217,33 +226,80 @@ summary(model_sv)#coef 2.044 p mic <2e-16
 model_ur<-glm(data=water, potability ~ uranium, family=binomial)
 summary(model_ur)#coef -, p 1.72e-11
 ```
-Observând rezultatele obținute, am descoperit faptul ca variabilele sunt relevante, mai putin florul, care are o valoare mare a lui p.
+Observând rezultatele obținute, am descoperit faptul ca variabilele sunt relevante, mai putin florul, care are o valoare mare a lui p. 
 
 
-
-
-Realizam modelul pentru variabilele relevante.
+Crearea modelelor pe date specifice
+--Primul model creat pe toate variabilele 
 ```{r}
 (model_final <- glm(data=train, potability~aluminium+barium+chloramine+chromium+silver+copper+nitrites+perchlorate+radium+ammonia+arsenic+cadmium+bacteria+viruses+lead+nitrates+mercury+selenium+uranium+flouride, family=binomial))
-#model_final <- glm(data=train, potability~aluminium+barium+chloramine+chromium+copper, family=binomial)
-summary(model_final)
+
 ```
 Observam faptul ca proprietatea aluminium este cea mai seminificativa, deoarece inregistreaza cea mai mica valoare a lui p, <2e-16. 
 
 
 ```{r}
 pred_test <- predict(model_final, newdata=test, type="response")
-table(pred_test > 0.5, test$potability)
+table(pred_test > 0.3, test$potability)
 ```
-
-
-
 ```{r}
-pred_mx <- predict(model_final, newdata=test, target="class")
-pred_mx
-(conf <- confusionMatrix(pred_mx, factor(test$potability)))
+pred_mx <- predict(model_final, newdata=test)
+(conf1 <- confusionMatrix(factor(ifelse(pred_mx>0.3, "Yes", "No")), factor(test$potability)))
+
 ```
 
+--Modelul 2 s-a realizat pe variabilele independente cu o relatie directa cu variabila dependenta
+```{r}
+model_2 <- glm(data=train, potability~aluminium+barium+chloramine+chromium+copper, family=binomial)
+summary(model_2)
+
+pred_test_2 <- predict(model_2, newdata=test, type="response")
+table(pred_test_2 > 0.3, test$potability)
+
+(conf2 <- confusionMatrix(factor(ifelse(pred_test_2>0.3, "Yes", "No")), factor(test$potability)))
+```
+
+
+--Modelul 3 s-a realizat pe variabilele independente cu o relatie indirecta cu variabila dependenta
+```{r}
+model_3 <- glm(data=train, potability~arsenic+cadmium+mercury+selenium+uranium, family=binomial)
+summary(model_3)
+
+pred_test_3 <- predict(model_3, newdata=test, type="response")
+table(pred_test_3 > 0.3, test$potability)
+
+(conf3 <- confusionMatrix(factor(ifelse(pred_test_3>0.3, "Yes", "No")), factor(test$potability)))
+```
+
+
+Cross-validation
+```{r}
+model_cv_lr  <- train (
+  x=x,
+  y=y,
+  method="glm",
+  family="binomial",
+  trControl = train_control
+)
+model_cv_lr
+pred_cv_lr = predict (model_cv_lr, newdata=test, type="raw")
+conf4 <- confusionMatrix(pred_cv_lr, test$potability)
+summary(model_cv_lr)
+
+```
+
+
+
+Tabel comparativ 
+```{r}
+
+model <- c('model_final','model_2','model_3', 'model_cv_lr')
+accuracy <- c(conf1$overall['Accuracy'], conf2$overall['Accuracy'], conf3$overall['Accuracy'], conf4$overall['Accuracy'])
+sensitivity <- c(conf1$byClass['Sensitivity'], conf2$byClass['Sensitivity'], conf3$byClass['Sensitivity'], conf4$byClass['Sensitivity'])
+specificity <- c(conf1$byClass['Specificity'], conf2$byClass['Specificity'], conf3$byClass['Specificity'], conf4$byClass['Specificity'])
+performance <- data.frame(model, accuracy, sensitivity, specificity)
+performance
+```
 
 
 
