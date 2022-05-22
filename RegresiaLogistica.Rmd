@@ -8,6 +8,17 @@ Importarea librariilor necesare
 #install.packages("rlang")
 #library(rlang)
 #install.packages("tidyverse")
+#install.packages("tree")
+#install.packages("rpart
+#install.packages("rpart.plot")
+#install.packages("ISLR")
+#install.packages("ipred")
+#install.packages("randomForest")
+#install.packages("ranger")
+#install.packages("partykit")
+#install.packages("caret")
+
+library(partykit)
 library(tidyverse)
 library(modelr)
 library(caret)
@@ -72,9 +83,9 @@ Am construit un grafic de puncte dupa proprietati si am observat ca nu e relevan
 ```{r}
 water %>% ggplot(aes(x=silver,y=perchlorate,color=potability))+
   geom_point()
-water %>% ggplot(aes(x=arsenic,y=cadmium,color=potability))+
+water %>% ggplot(aes(x=aluminium,y=cadmium,color=potability))+
   geom_point()
-water %>% ggplot(aes(x=aluminium,y=ammonia,color=potability))+
+water %>% ggplot(aes(x=aluminium,y=barium,color=potability))+
   geom_point()
 ```
 
@@ -85,7 +96,7 @@ summarize(by_potability, count=n())
 ```
 
 
-Dorim sa vizualizam diferentele dintre variabile si care este legatura dintre cu variabila tinta, astfel ca afisam un grafic ce ilustreaza situatia pentru fiecare proprietate a apei in parte. Am utilizat valorile minime pentru fiecare variabila ca si termen de comparatie.
+
 
 ```{r}
 
@@ -144,80 +155,93 @@ test <- testing(split)
 
 ---ANALIZA DATELOR---
 
-
-Generarea unui model in functie de toate proprietatile.
-```{r}
-(model_all <- glm(data=water_f, potability~ph+Hardness+Solids+Chloramines+Sulfate+Conductivity+Organic_carbon+Trihalomethanes+Turbidity, family=binomial))
-summary(model_all)
-```
-
 Generarea unui model in functie de proprietati.
 ```{r}
-model_ph<-glm(data=water, potability ~ ph, family=binomial)
-summary(model_ph)
+model_al<-glm(data=water, potability ~ aluminium, family=binomial)
+summary(model_al) #<2e 0.574
 
-model_hard<-glm(data=water, potability ~ Hardness, family=binomial)
-summary(model_hard)
+model_am<-glm(data=water, potability ~ ammonia, family=binomial)
+summary(model_am)#0.045, coef -
 
-model_sol<-glm(data=water, potability ~ Solids, family=binomial)
-summary(model_sol)
+model_ar<-glm(data=water, potability ~ arsenic, family=binomial)
+summary(model_ar)#<2e, coef -
 
-model_ch<-glm(data=water, potability ~ Chloramines, family=binomial)
-summary(model_ch)
+model_br<-glm(data=water, potability ~ barium, family=binomial)
+summary(model_br)#7.62e
 
-model_sulf<-glm(data=water, potability ~ Sulfate, family=binomial)
-summary(model_sulf)
+model_cd<-glm(data=water, potability ~ cadmium, family=binomial)
+summary(model_cd)#<2e, coef -
 
-model_cond<-glm(data=water, potability ~ Conductivity, family=binomial)
-summary(model_cond)
+model_cl<-glm(data=water, potability ~ chloramine, family=binomial)
+summary(model_cl)#<2e
 
-model_org<-glm(data=water, potability ~ Organic_carbon, family=binomial)
-summary(model_org)
+model_cr<-glm(data=water, potability ~ chromium, family=binomial)
+summary(model_cr)#<2e, coef mare 1.84
 
-model_thr<-glm(data=water, potability ~ Trihalomethanes, family=binomial)
-summary(model_thr)
+model_cp<-glm(data=water, potability ~ copper, family=binomial)
+summary(model_cp)#0.0084 0.14
 
-model_trb<-glm(data=water, potability ~ Turbidity, family=binomial)
-summary(model_trb)
+model_fl<-glm(data=water, potability ~ flouride, family=binomial)
+summary(model_fl)# p mare
 
+model_bc<-glm(data=water, potability ~ bacteria, family=binomial)
+summary(model_bc)#0.0485 coef -
+
+model_vs<-glm(data=water, potability ~ viruses, family=binomial)
+summary(model_vs)#p mic, coef negativ
+
+model_ld<-glm(data=water, potability ~ lead, family=binomial)
+summary(model_ld)# coef - p mare
+
+model_na<-glm(data=water, potability ~ nitrates, family=binomial)
+summary(model_na)#p 1.393e coef neagtiv
+
+model_ni<-glm(data=water, potability ~ nitrites, family=binomial)
+summary(model_ni)#coef poz, p mic 2.74e
+
+model_mc<-glm(data=water, potability ~ mercury, family=binomial)
+summary(model_mc)#foarte mic beta, p doua stele
+
+model_pc<-glm(data=water, potability ~ perchlorate, family=binomial)
+summary(model_pc)#p 1.71e-11 coef 0.012
+
+model_rd<-glm(data=water, potability ~ radium, family=binomial)
+summary(model_rd)#p 8.11e-09 coef 0.08
+
+model_sl<-glm(data=water, potability ~ selenium, family=binomial)
+summary(model_sl)#coef -, p 2 stele
+
+model_sv<-glm(data=water, potability ~ silver, family=binomial)
+summary(model_sv)#coef 2.044 p mic <2e-16
+
+model_ur<-glm(data=water, potability ~ uranium, family=binomial)
+summary(model_ur)#coef -, p 1.72e-11
 ```
-Observam faptul ca valoarea lui p este destul de mare in fiecare din cazuri, ceea ce inseamna ca asocierea dintre variabila si variabila tinta nu este una seminificativa. Alegem insa spre analiza primele 3 cele mai mici valori ale lui p, si anume proprietatile Solids (p=0.0536), Organic_carbon (p=0.0861) si Chloraminele(p=0.174).
+Observând rezultatele obținute, am descoperit faptul ca variabilele sunt relevante, mai putin florul, care are o valoare mare a lui p.
 
 
-Realizam modelul pentru cele 3 variabile alese.
+
+
+Realizam modelul pentru variabilele relevante.
 ```{r}
-(model_final <- glm(data=train, potability~Solids+Organic_carbon+Chloramines, family=binomial))
+(model_final <- glm(data=train, potability~aluminium+barium+chloramine+chromium+silver+copper+nitrites+perchlorate+radium+ammonia+arsenic+cadmium+bacteria+viruses+lead+nitrates+mercury+selenium+uranium+flouride, family=binomial))
+#model_final <- glm(data=train, potability~aluminium+barium+chloramine+chromium+copper, family=binomial)
 summary(model_final)
 ```
-Observam faptul ca proprietatea Solids este cea mai seminificativa, deoarece inregistreaza cea mai mica valoare a lui p de 0.0617. 
+Observam faptul ca proprietatea aluminium este cea mai seminificativa, deoarece inregistreaza cea mai mica valoare a lui p, <2e-16. 
 
 
 ```{r}
-(pred_test <- predict(model_final, newdata=test, type="response"))
+pred_test <- predict(model_final, newdata=test, type="response")
 table(pred_test > 0.5, test$potability)
 ```
 
 
 
-
-1.SOLIDS
-Valoarea minima si maxima
 ```{r}
-range(water$Solids)
-```
-
-```{r}
-grid <- water %>%
-  data_grid(Solids = seq_range(Solids, 100)) %>%
-  add_predictions(model_sol, "prob_default", type="response")
-```
-```{r}
-ggplot()+
-  geom_line(data=grid, aes(Solids, prob_default),color="red")
-```
-```{r}
-(nd <- tribble(~Solids, 1000,2000))
-(predicted <- predict(model_sol, newdata=nd, type="response"))
+pred_mx <- predict(model_final, newdata=test, target="class")
+pred_mx
+(conf <- confusionMatrix(pred_mx, factor(test$potability)))
 ```
 
 
@@ -225,8 +249,5 @@ ggplot()+
 
 
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
 
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
