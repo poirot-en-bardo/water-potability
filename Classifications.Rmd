@@ -146,9 +146,13 @@ confusionMatrix(pred$class, test$potability)
 
 
 
------------------- Arbori de decizie ----------------------
+
+__________________________________________________________________________________________
+
+## Arbori de decizie 
 
 
+1. Arbore simplu folosind pachetul rpart:
 ```{r}
 set.seed(123)
 mod_tree1 = rpart(
@@ -176,36 +180,32 @@ rpart.plot(mod_tree1)
 #predictie pe test
 pred_mod_tree1 <- predict(mod_tree1, newdata = test, target ="class")
 #adaugam coloana cu no/yes
-(pred_mod_tree1 <- as_tibble(pred_mod_tree1) %>% mutate(class = ifelse(No >= Yes, "No", "Yes")))
-```
-```{r}
-confusionMatrix(factor(pred_mod_tree1$class), factor(test$potability))
-#p-value f mic --> model bun
-```
-
-Pruning
-```{r}
-set.seed(123)
-mod_tree1_pruned <- prune(mod_tree1, cp=0.005)
-mod_tree1_pruned
-
-```
-
-```{r}
-pred_m1_pruned <- predict(mod_tree1_pruned, newdata = test, target = "class")
-pred_m1_pruned <- as_tibble(pred_m1_pruned) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
-confusionMatrix(factor(pred_m1_pruned$class), factor(test$potability))
+pred_mod_tree1 <- as_tibble(pred_mod_tree1) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+(cmt1 <- confusionMatrix(factor(pred_mod_tree1$class), factor(test$potability)))
 ```
 
 
-Arbore netaiat
+Comparatie cu un arbore simplu realizat cu Cross-Validation:
 ```{r}
-m2 <- rpart(potability ~., 
+mod_tree_cv <- train(x,y,
+                     method = "rpart",
+                      trControl = train_control)
+pred_mod_tree_cv <- predict(mod_tree_cv, newdata = test, target ="class")
+(cmt_cv <- confusionMatrix(pred_mod_tree_cv, factor(test$potability)))
+```
+Modelul realizat prin rpart este cu putin mai bun.
+
+
+
+
+
+2. Arbore netaiat
+```{r}
+mod_tree_full <- rpart(potability ~., 
             data = train,
             method = "class",
             control = list(cp=0)) 
-m2
-rpart.plot(m2)
+rpart.plot(mod_tree_full)
 ```
 
 
@@ -213,57 +213,72 @@ Acuratete mai buna pentru arborele netaiat:
 ```{r}
 pred_m2 <- predict(m2, newdata = test, target = "class")
 pred_m2 <- as_tibble(pred_m2) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
-confusionMatrix(factor(pred_m2$class), factor(test$potability))
+(cmt2 <- confusionMatrix(factor(pred_m2$class), factor(test$potability)))
 ```
 
 
-Mai slab dupa pruning. Observăm că valoarea 0.008 pt cp (complexity parameter) e mai buna decat 0.01
+3. Pruning: 
+
 ```{r}
-m2_pruned <- prune(m2, cp = 0.008)
+m2_pruned <- prune(m2, cp = 0.005)
 pred_m2_pruned <- predict(m2_pruned, newdata = test, target = "class")
 pred_m2_pruned <- as_tibble(pred_m2_pruned) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
-confusionMatrix(factor(pred_m2_pruned$class), factor(test$potability))
+(cmt3 <- confusionMatrix(factor(pred_m2_pruned$class), factor(test$potability)))
 
 ```
 
 
 
-Cu optimizarea entropiei:
+4. Cu optimizarea entropiei, folosind functia tree():
 ```{r}
 set.seed(123)
-m1_tree <- tree(potability ~., data = train) 
-summary(m1_tree)
-#acuratete mai mare pe setul de antrenament
+mod_tree_entropy <- tree(potability ~., data = train) 
+summary(mod_tree_entropy)
 ```
 
 
 ```{r}
-pred_m1_tree <- predict(m1_tree, newdata = test, target = "class")
-pred_m1_tree <- as_tibble(pred_m1_tree) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
-confusionMatrix(factor(pred_m1_tree$class), factor(test$potability))
+pred_tree_entropy <- predict(mod_tree_entropy, newdata = test, target = "class")
+pred_tree_entropy <- as_tibble(pred_tree_entropy) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+(cmt4 <- confusionMatrix(factor(pred_tree_entropy$class), factor(test$potability)))
 ```
 
 
-Cu optimizarea coeficientului Gini
+5. Cu optimizarea coeficientului Gini
 
 ```{r}
 set.seed(123)
-m1_tree_gini <- tree(potability ~., data = train, split="gini")
-summary(m1_tree_gini)
+mod_tree_gini <- tree(potability ~., data = train, split="gini")
+summary(mod_tree_gini)
 ```
 
 
 ```{r}
-pred_m1_tree_gini <- predict(m1_tree_gini, newdata = test, target = "class")
-pred_m1_tree_gini <- as_tibble(pred_m1_tree_gini) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
-confusionMatrix(factor(pred_m1_tree_gini$class), factor(test$potability))
+pred_tree_gini <- predict(mod_tree_gini, newdata = test, target = "class")
+pred_tree_gini <- as_tibble(pred_tree_gini) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
+(cmt5 <- confusionMatrix(factor(pred_tree_gini$class), factor(test$potability)))
 ```
 
-Rezulta cele mai bune variante: arborele netaiat, urmat de arborele cu optimizarea coeficientului Gini.
 
 
-#TODO: curbe ROC pentru cele 3 metode
 
+Evaluarea performantei arborilor de decizie:
+
+
+```{r}
+model <- c('tree1','tree_full','tree_pruned','tree_entropy','tree_gini')
+accuracy <- c(cmt1$overall['Accuracy'], cmt2$overall['Accuracy'], cmt3$overall['Accuracy'],cmt4$overall['Accuracy'],cmt5$overall['Accuracy'])
+sensitivity <- c(cmt1$byClass['Sensitivity'], cmt2$byClass['Sensitivity'], cmt3$byClass['Sensitivity'],cmt4$byClass['Sensitivity'],cmt5$byClass['Sensitivity'])
+specificity <- c(cmt1$byClass['Specificity'], cmt2$byClass['Specificity'], cmt3$byClass['Specificity'],cmt4$byClass['Specificity'],cmt4$byClass['Specificity'])
+performance <- data.frame(model, accuracy, sensitivity, specificity)
+performance
+```
+
+În acest caz, desi arborele netaiat pare cel mai perfomant, vom face exceptia de alege următorul model ca performanță (tree_gini), pentru a evita overfitting-ul.
+
+```{r}
+best_tree <- mod_tree_gini
+```
 
 
 
@@ -271,6 +286,8 @@ Rezulta cele mai bune variante: arborele netaiat, urmat de arborele cu optimizar
 
 ------------------------- Bagging ------------------------
 
+
+1. Model simplu:
 ```{r}
 set.seed(123)
 mod_bagged1 <- bagging(potability ~ .,
@@ -282,7 +299,7 @@ Acuratetea de training = 100 - 3.82 = 96.18%
 
 ```{r}
 pred_mod_bagged1 <- predict(mod_bagged1, newdata = test, target = "class")
-confusionMatrix(pred_mod_bagged1, factor(test$potability))
+(cmb1 <- confusionMatrix(pred_mod_bagged1, factor(test$potability)))
 ```
 
 
@@ -303,6 +320,7 @@ for (i in seq_along(ntree)) {
 plot(ntree, misclassification, type="l", lwd="2")
 ```
 
+2. Model cu optimizarea numarului de bags:
 Optăm pentru 36 de bags:
 
 ```{r}
@@ -313,27 +331,53 @@ mod_bagged_36
 
 ```{r}
 pred_mod_bagged_36 <- predict(mod_bagged_36, newdata = test, target = "class")
-confusionMatrix(pred_mod_bagged_36, factor(test$potability))
+(cmb2 <- confusionMatrix(pred_mod_bagged_36, factor(test$potability)))
 ```
 
-Cea mai buna acuratete de pana acum: 96,58%.
+
+
+3. Model Bagging cu caret si Cross-Validation:
+
+```{r}
+mod_bagged_cv <- train(x,
+                   y,
+                   method="treebag",
+                   trControl=train_control,
+                   nbag = 36,
+                   importance=TRUE)
+
+mod_bagged_cv
+```
+
+
+```{r}
+pred_mod_bagged_cv <- predict(mod_bagged_cv, newdata = test, target = "class")
+(cmb3 <- confusionMatrix(pred_mod_bagged_cv, factor(test$potability)))
+```
 
 
 
+```{r}
+model <- c('bagged1','bagged2','bagged_cv')
+accuracy <- c(cmb1$overall['Accuracy'], cmb2$overall['Accuracy'], cmb3$overall['Accuracy'])
+sensitivity <- c(cmb1$byClass['Sensitivity'], cmb2$byClass['Sensitivity'], cmb3$byClass['Sensitivity'])
+specificity <- c(cmb1$byClass['Specificity'], cmb2$byClass['Specificity'], cmb3$byClass['Specificity'])
+performance <- data.frame(model, accuracy, sensitivity, specificity)
+performance
+```
 
+Vom selecta modelul bagged2 drept cel mai performant:
 
-
-
-
-
-
+```{r}
+bagged_best <- mod_bagged_36
+```
 
 
 ---------------- Random Forest ----------------------------
 
 
 
-Cu biblioteca randomForest:
+1. Model simplu cu biblioteca randomForest:
 ```{r}
 set.seed(123)
 mod_rf1 <- randomForest(
@@ -343,6 +387,9 @@ mod_rf1 <- randomForest(
 #pt ca avem 20 variabile in total si m=p/3 =11/3 aprox = 3
 mod_rf1
 ```
+
+
+Vizualizarea evolutiei ratei erorii de clasificare:
 ```{r}
 plot(mod_rf1)
 ```
@@ -350,7 +397,7 @@ plot(mod_rf1)
 
 ```{r}
 pred_mod_rf1 <- predict(mod_rf1, test, target ="class")  
-confusionMatrix(pred_mod_rf1, factor(test$potability))
+(cm1 <- confusionMatrix(pred_mod_rf1, factor(test$potability)))
 ```
 
 
@@ -384,40 +431,29 @@ hyper_grid %>%
   top_n(-10)
 ```
 
-Identificam parametrii optimi: mtry = 19 atribute, node_size = 3, sample_size = 0.8
-Iteram de 100 de ori folosind combinatia optima de parametri:
+Identificam parametrii optimi: mtry = 19 atribute, node_size = 3, sample_size = 0.8.
+
+2. Model ajustat prin tuning:
 
 ```{r}
-OOB_ERR <- vector(mode = "numeric", length = 100)
-for(i in seq_along(OOB_ERR)) {
-  optimal_ranger <- ranger(
-    formula         = potability ~ ., 
-    data            = train, 
-    num.trees       = 500,
-    mtry            = 19,
-    min.node.size   = 3,
-    sample.fraction = .8,
-    importance      = 'none'
-  )
-  
-  OOB_ERR[i] <- optimal_ranger$prediction.error
-}
+mod_rf_tuned <- randomForest(
+  formula = potability ~ .,
+  data = train,
+  num.trees = 500,
+  mtry  = 19,
+  min.node.size = 3,
+  sample.fraction = .8
+)
+mod_rf_tuned
+```
 
-hist(OOB_ERR, breaks = 20)
-#distributa celor 100 de valori
-mean(OOB_ERR)
+```{r}
+pred_mod_rf_tuned <- predict(mod_rf_tuned, test, target ="class")  
+(cm_tuned <- confusionMatrix(pred_mod_rf_tuned, factor(test$potability)))
 ```
 
 
-Predictia pe setul de test:
-```{r}
-pred_ranger <- predict(optimal_ranger, test, target ="class")  
-confusionMatrix(pred_ranger$predictions, factor(test$potability))
-```
-
-
-
-Cu caret si Cross-Validation:
+3. Model cu caret si Cross-Validation:
 
 ```{r}
 mod_rf2 <- train(potability~.,
@@ -428,33 +464,30 @@ mod_rf2
 ```
 ```{r}
 pred_mod_rf2 <- predict(mod_rf2, test, target ="class")  
-confusionMatrix(pred_mod_rf2, factor(test$potability))
+(cm2 <- confusionMatrix(pred_mod_rf2, factor(test$potability)))
 ```
 
 
 
 
 
----- Curbe ROC -----
-```{r}
-summary(pred_mod_bagged1)
-```
 
+### Evaluarea performantei modelelor:
 
 ```{r}
 pred_rf1_roc <- predict(mod_rf1, test, type="prob")  
 pred_rf2_roc <- predict(mod_rf2, test, type="prob")  
-pred_ranger_roc <- predict(optimal_ranger, test, probability = TRUE)  
-summary(pred_ranger_roc)
-pred_ranger_roc$predictions
+pred_rf_tuned <- predict(mod_rf_tuned, test, type = "prob")
 ```
 
 
+Realizam graficul curbelor ROC pentru cele 3 modele:
 ```{r}
-dataset <- data.frame(actual.class = test$potability, probability = pred_rf1_roc, pred_rf2_roc, pred_ranger_roc$predictions)
+dataset <- data.frame(actual.class = test$potability, probability = pred_rf1_roc, pred_rf2_roc, pred_rf_tuned)
 roc_rf1 <- roc(actual.class~pred_rf1_roc[,1], dataset)
 roc_rf2 <- roc(actual.class~pred_rf2_roc[,1], dataset)
-roc_ranger <- roc(actual.class~pred_ranger_roc$predictions, dataset)
+roc_rf_tuned <- roc(actual.class~pred_rf_tuned[,1], dataset)
+
 
 df1 <- data.frame(
   specificity1 <- roc_rf1$specificities, 
@@ -463,7 +496,10 @@ df1 <- data.frame(
 df2 <- data.frame(
   specificity2 <- roc_rf2$specificities, 
   sensitivity2 <- roc_rf2$sensitivities)
-#scale_x_reverse = specificitatea 1 merge catre 0
+
+df3 <- data.frame(
+  specificity3 <- roc_rf_tuned$specificities, 
+  sensitivity3 <- roc_rf_tuned$sensitivities)
 
 ggplot() + 
   geom_line(df1, mapping = aes(x= specificity1, y = sensitivity1), color = "dark green") + 
@@ -471,18 +507,45 @@ ggplot() +
   theme(text = element_text(size = 20))+
 geom_line(df2, mapping = aes(x = specificity2, y = sensitivity2), color = "blue") + 
   scale_x_reverse() +
-  theme(text = element_text(size = 20))
+  theme(text = element_text(size = 20))+
+geom_line(df3, mapping = aes(x = specificity3, y = sensitivity3), color = "orange") + 
+  scale_x_reverse() +
+  theme(text = element_text(size = 20))+
+labs(
+  title = 'ROC - Modele Random Forest',
+  x = 'specificitate',
+  y = 'senzitivitate')
+```
 
+Analizam performanta celor 3 modele:
+```{r}
+model <- c('rf1','rf2','rf_tuned')
+auc <- c(auc(roc_rf1), auc(roc_rf2), auc(roc_rf_tuned))
+accuracy <- c(cm1$overall['Accuracy'], cm2$overall['Accuracy'], cm_tuned$overall['Accuracy'])
+sensitivity <- c(cm1$byClass['Sensitivity'], cm2$byClass['Sensitivity'], cm_tuned$byClass['Sensitivity'])
+specificity <- c(cm1$byClass['Specificity'], cm2$byClass['Specificity'], cm_tuned$byClass['Specificity'])
+performance <- data.frame(model, accuracy, auc, sensitivity, specificity)
+performance
+```
 
+Vom alege modelul rf_tuned drept cel mai bun Random Forest.
 
-plot.roc(roc_rf1, print.auc=TRUE, col="dark green")
-plot.roc(roc_rf2, print.auc=TRUE, col="blue", add = TRUE)
-plot(roc_ranger, print.auc=TRUE, print.auc.y=.3, col="dark green")
-
+```{r}
+rf_best <- mod_rf_tuned
 ```
 
 
-- Random Forest
 
 
 
+
+
+
+
+
+
+------------------- Evaluare Curbe ROC -----------------------
+
+```{r}
+summary(pred_mod_bagged1)
+```
