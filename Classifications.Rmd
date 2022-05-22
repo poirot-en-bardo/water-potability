@@ -287,9 +287,9 @@ best_tree <- mod_tree_gini
 
 
 
+__________________________________________________________________________________________
 
-
-------------------------- Bagging ------------------------
+## Bagging
 
 
 1. Model simplu:
@@ -477,7 +477,7 @@ pred_mod_rf2 <- predict(mod_rf2, test, target ="class")
 
 
 
-### Evaluarea performantei modelelor:
+## Evaluarea performantei modelelor:
 
 ```{r}
 pred_rf1_roc <- predict(mod_rf1, test, type="prob")  
@@ -486,7 +486,7 @@ pred_rf_tuned <- predict(mod_rf_tuned, test, type = "prob")
 ```
 
 
-Realizam graficul curbelor ROC pentru cele 3 modele:
+Realizam graficul curbelor ROC pentru cele 3 modele RF:
 ```{r}
 data_frame <- data.frame(actual.class = test$potability, probability = pred_rf1_roc, pred_rf2_roc, pred_rf_tuned)
 roc_rf1 <- roc(actual.class~pred_rf1_roc[,1], data_frame)
@@ -548,8 +548,7 @@ best_rf <- mod_rf_tuned
 
 
 
-
-------------------- Evaluare Curbe ROC -----------------------
+### Evaluare Curbe ROC 
 
 ```{r}
 pred_nb_roc <- predict(best_nb, test, type = "prob")  
@@ -612,11 +611,16 @@ labs(
 ```
 
 
+
+Matricele de confuzie pentru extragerea masurilor de evaluare a performantei:
 ```{r}
 #cm_lr <- confusionMatrix(pred_mod_lr, factor(test$potability))
 cm_nb <- confusionMatrix(pred_nb_roc$class, factor(test$potability))
+
+pred_tree_roc
 pred_tree_roc <- as_tibble(pred_tree_roc) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
 cm_tree <- confusionMatrix(factor(pred_tree_roc$class), factor(test$potability))
+
 pred_bagged_roc <- as_tibble(pred_bagged_roc) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
 cm_bag <- confusionMatrix(factor(pred_bagged_roc$class), factor(test$potability))
 pred_rf_roc <- as_tibble(pred_rf_roc) %>% mutate(class = ifelse(No >= Yes, "No", "Yes"))
@@ -625,6 +629,8 @@ cm_rf <- confusionMatrix(factor(pred_rf_roc$class), factor(test$potability))
 ```
 
 
+
+Tabelul cu parametrii de evaluare aferenti fiecarui model, ordonat dupa acuratețe si AUC:
 ```{r}
 model <- c('nb','tree','bagging','rf')
 auc <- c(auc(roc_nb), auc(roc_tree), auc(roc_bagged), auc(roc_rf))
