@@ -8,7 +8,7 @@ output:
 
 - Încărcarea bibliotecilor necesare în proiect:
 
-```{r}
+```{r results = 'hide'}
 library(tidyverse)
 library(modelr)
 library(caret)
@@ -621,7 +621,10 @@ best_bagged <- mod_bagged_36
 ```
 
 
----------------- Random Forest ----------------------------
+
+_____________________________________________________________________________________
+
+## Random Forest 
 
 
 
@@ -776,10 +779,10 @@ performance <- data.frame(model, accuracy, auc, sensitivity, specificity)
 performance
 ```
 
-Vom alege modelul rf_tuned drept cel mai bun Random Forest.
+Vom alege modelul rf_2 drept cel mai bun Random Forest.
 
 ```{r}
-best_rf <- mod_rf_tuned
+best_rf <- mod_rf2
 ```
 
 
@@ -801,7 +804,7 @@ pred_bagged_roc <- predict(best_bagged, test, type = "prob")
 pred_rf_roc <- predict(best_rf, test, type = "prob")
 
 
-df_roc <- data.frame(actual.class = test$potability, probability = pred_lr_roc, pred_nb_roc, pred_tree_roc, pred_bagging_roc, pred_rf_roc)
+df_roc <- data.frame(actual.class = test$potability, probability = pred_lr_roc, pred_nb_roc, pred_tree_roc, pred_bagged_roc, pred_rf_roc)
 roc_lr <- roc(actual.class~pred_lr_roc[,1], df_roc)
 roc_nb <- roc(actual.class~pred_nb_roc$posterior[,1], df_roc)
 roc_tree <- roc(actual.class~pred_tree_roc[,1], df_roc)
