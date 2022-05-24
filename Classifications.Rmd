@@ -101,7 +101,7 @@ water %>% group_by(potability) %>%
   geom_bar(stat = "identity", position = "dodge") +
   facet_wrap(~features, scales = "free")
 ```
-
+- Vizualizarea distribuției valorilor atributelor, pe categorii de potabilitate, sub forma de boxplot:  
 
 ```{r}
 water.m <- melt(water, id.var = "potability")
@@ -109,7 +109,8 @@ p <- ggplot(data = water.m, aes(x=variable, y=value)) +
              geom_boxplot(aes(fill=potability))
 p + facet_wrap( ~ variable, scale="free")
 ```
-- Distributia valorilor fiecărei variabile pentru apa nepotabilă (digrame de densitate):
+  
+- Distributia valorilor fiecărei variabile pentru apa nepotabilă (digrame de densitate):  
 
 ```{r}
 water %>%
@@ -240,13 +241,14 @@ Observând rezultatele obținute, am descoperit faptul ca variabilele sunt relev
 Crearea modelelor pe date specifice
 1. Primul model creat pe toate variabilele 
 ```{r}
-(model_final <- glm(data=train, potability~aluminium+barium+chloramine+chromium+silver+copper+nitrites+perchlorate+radium+ammonia+arsenic+cadmium+bacteria+viruses+lead+nitrates+mercury+selenium+uranium+flouride, family=binomial))
+model_final <- glm(data=train, potability~aluminium+barium+chloramine+chromium+silver+copper+nitrites+perchlorate+radium+ammonia+arsenic+cadmium+bacteria+viruses+lead+nitrates+mercury+selenium+uranium+flouride, family=binomial)
+summary(model_final)$coefficients
 
 ```
-Observam faptul ca proprietatea aluminium este cea mai seminificativa, deoarece inregistreaza cea mai mica valoare a lui p, <2e-16. 
+Observam faptul ca proprietatea aluminium este cea mai seminificativa, deoarece inregistreaza cea mai mica valoare a lui p. 
 
 
-Considerăm valoarea de 0.3 drept prag pentru clasificarea in Yes/No:
+Realizăm matricea de confuzie, considerând valoarea de 0.3 drept prag pentru clasificarea in Yes/No:
 ```{r}
 pred_mx <- predict(model_final, newdata=test)
 (conf1 <- confusionMatrix(factor(ifelse(pred_mx>0.3, "Yes", "No")), factor(test$potability)))
@@ -379,7 +381,7 @@ best_nb <- mod_nb2$finalModel
 
 
 
-```{r}
+```{r warning = FALSE}
 #predictie pe setul de test, cu probabilitatea aferenta
 pred_nb <- predict(best_nb, test, type="prob")
 #compara predictiile cu valorile reale
