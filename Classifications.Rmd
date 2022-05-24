@@ -637,7 +637,7 @@ mod_rf1 <- randomForest(
   formula = potability ~ .,
   data = train
 ) #selecteaza aleatoriu 6 variabile la fiecare impartire 
-#pt ca avem 20 variabile in total si m=p/3 =11/3 aprox = 3
+#pt ca avem 20 variabile in total si m=p/3 =20/3 aprox = 6
 mod_rf1
 ```
 
@@ -697,6 +697,7 @@ mod_rf_tuned <- randomForest(
   min.node.size = 3,
   sample.fraction = .8
 )
+?randomForest
 mod_rf_tuned
 ```
 
@@ -712,8 +713,10 @@ pred_mod_rf_tuned <- predict(mod_rf_tuned, test, target ="class")
 mod_rf2 <- train(potability~.,
                 data = train,
                 method = 'rf',
-                trControl = train_control)
+                trControl = train_control
+                )
 mod_rf2
+
 ```
 ```{r}
 pred_mod_rf2 <- predict(mod_rf2, test, target ="class")  
@@ -781,7 +784,7 @@ performance <- data.frame(model, accuracy, auc, sensitivity, specificity)
 performance
 ```
 
-Vom alege modelul rf_2 drept cel mai bun Random Forest.
+Vom alege modelul rf2 drept cel mai bun Random Forest.
 
 ```{r}
 best_rf <- mod_rf2
